@@ -1,0 +1,54 @@
+name: Kaggle CI/CD Automation
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  kaggle-workflow:
+    runs-on: ubuntu-latest
+
+    env:
+      KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+      KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.11
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install kaggle kagglehub pandas numpy scikit-learn jupyter
+
+    - name: Kaggle API Authentication
+      run: |
+        mkdir -p ~/.kaggle
+        echo "{\"username\":\"$KAGGLE_USERNAME\",\"key\":\"$KAGGLE_KEY\"}" > ~/.kaggle/kaggle.json
+        chmod 600 ~/.kaggle/kaggle.json
+
+    - name: Upload Dataset to Kaggle
+      run: |
+        kaggle datasets version -p datasets/your-dataset -m "Automated update via GitHub Actions"
+
+    - name: Push Kaggle Notebook
+      run: |
+        kaggle kernels push -p notebooks/your-notebook
+
+    - name: Run Training Script
+      run: |
+        cd models
+        pip install -r requirements.txt
+        python train.py
+
+    - name: Upload Model to KaggleHub
+      env:
+        KAGGLEHUB_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+        KAGGLEHUB_KEY: ${{ secrets.KAGGLE_KEY }}
+      run: |
+        kagglehub login -u $KAGGLEHUB_USERNAME -p $KAGGLEHUB_KEY
+        kagglehub model_upload "$KAGGLEHUB_USERNAME/my_model/pyTorch/1b" models/output "Apache 2.0"
